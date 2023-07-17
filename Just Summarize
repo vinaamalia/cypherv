@@ -112,3 +112,104 @@ WHERE type(r) = "WROTE"
 SET r += { amount: 3 }
 RETURN r
 
+// inject traffic without java
+// Assuming you have a Neo4j database running locally
+
+// Define the traffic value
+:param trafficValue => 'some_traffic_value'
+
+// Run the Cypher query with the traffic parameter
+MATCH (a:Traffic {type: $trafficValue})
+RETURN a
+
+// Here's a step-by-step guide on how to execute this query in the Neo4j Browser:
+
+// Open the Neo4j Browser.
+// In the query editor, copy and paste the complete query example provided above.
+// Replace the value 'some_traffic_value' with the desired traffic value you want to use.
+// Click the "Run" button or press Ctrl + Enter to execute the query.
+// The query result will be displayed in the result panel.
+// This example demonstrates how to execute the Cypher query directly in the Neo4j Browser, without relying on any specific programming language or client library. You can adjust the value of the trafficValue parameter as needed to match your specific scenario.
+
+
+================================================================================================================================
+// Using optional match
+MATCH (n:Person {name: 'Neo'})
+OPTIONAL MATCH (n)-[r]->(m {name: 'Alice'})
+RETURN n, r, m
+
+=============================================
+count(*) is an aggregate expression.
+MATCH (n:Label)-[r]->(m:Label)
+RETURN count(*) AS nbr
+
+
+MATCH (p:Person)
+RETURN collect(p.age)
+Result :
+collect(p.age)
+[58, 70, 55, 55, 71]
+
+// with syntax is similar to RETURN
+MATCH (user)-[:FRIEND]-(friend)
+WHERE user.name = $name
+WITH user, count(friend) AS friends
+WHERE friends > 10
+RETURN user
+
+//Jalankan operasi mutasi untuk setiap elemen dalam daftar.
+WITH ['Alice', 'Neo'] AS names
+FOREACH ( value IN names | CREATE (:Person {name: value}) )
+
+
+// show property keys 
+MATCH (n) WHERE (n.relationships) IS NOT NULL 
+RETURN DISTINCT "node" as entity, n.relationships AS relationships LIMIT 25 
+UNION ALL 
+MATCH ()-[r]-() WHERE (r.relationships) IS NOT NULL 
+RETURN DISTINCT "relationship" AS entity, r.relationships AS relationships LIMIT 25
+
+
+// menghapus node yang tidak ada relationship
+MATCH (n)
+WHERE NOT EXISTS((n)-[]-())
+DELETE n    
+
+// hapus yang tidak punya property born
+MATCH (n)
+WHERE n.born IS NULL
+DELETE n
+
+// hapus relatuonship person yang tidak punya property born <ini syarat untuk bisa menghapus node yang relationshipnya belum dihapus>
+MATCH (n:Person)-[r]-()
+WHERE n.born IS NULL 
+DELETE r
+
+// Update property relationship
+MATCH ()-[r:WROTE]->()
+WHERE type(r) = "WROTE"
+SET r += { amount: 3 }
+RETURN r
+
+// calculate packet loss
+MATCH (source)-[transmission]->(destination)
+WHERE source.name = 'SourceDevice' AND destination.name = 'DestinationDevice'
+WITH sum(transmission.packetCount) AS totalPackets
+RETURN totalPackets
+
+MATCH (source)-[transmission]->(destination)
+WHERE EXISTS(transmission.totalPackets) AND EXISTS(transmission.receivedPackets)
+WITH transmission, (transmission.totalPackets - transmission.receivedPackets) AS lostPackets
+WITH transmission, lostPackets, (lostPackets / transmission.totalPackets) * 100 AS lossPercentage
+RETURN transmission, lossPercentage
+
+// CONTOH clause untuk IF else pada cypher
+MATCH (n:Node)
+RETURN n.name, 
+CASE
+  WHEN n.age < 18 THEN 'Minor'
+  WHEN n.age >= 18 AND n.age < 65 THEN 'Adult'
+  ELSE 'Senior'
+END AS ageGroup
+
+
