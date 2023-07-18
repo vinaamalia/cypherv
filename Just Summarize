@@ -213,3 +213,94 @@ CASE
 END AS ageGroup
 
 
+
+MATCH (t)-[r]->(nextNode)
+RETURN
+  CASE 
+  WHEN t.load = $value AND r.capacity = $valuee THEN 0
+  ELSE t.load END AS result,
+  nextNode.property AS nextNodeProperty
+
+// handle null values and replace them with a dynamically changing value
+MATCH (n:Node)
+RETURN n.property, COALESCE(n.nullableProperty, $dynamicValue) AS updatedProperty
+
+// reset the properties to zero using a dynamic value,
+MATCH (n:Node)
+SET n.property = CASE
+  WHEN n.nullableProperty IS NULL THEN $dynamicValue
+  ELSE 0
+END
+RETURN n
+
+// collect
+MATCH (p:Person)
+RETURN collect(p.age)
+
+// hapus semua node yang punya relationship, kecuali node yang tidak ada relationship
+MATCH (n)
+WHERE size((n)-[]-()) > 0
+WITH n
+LIMIT 1
+RETURN n
+UNION
+MATCH (n)
+WHERE size((n)-[]-()) = 0
+DETACH DELETE n
+
+
+// RENAME the type of traffic
+MATCH (n)-[oldRel:FOLLOWS]->(m)
+CREATE (n)-[newRel:FRIEND_OF]->(m)
+SET newRel = oldRel
+DELETE oldRel
+
+// APOC LOAD
+
+// shortest path 
+MATCH (start:Label {property: 'value1'}), (end:Label {property: 'value2'})
+MATCH path = shortestPath((start)-[:RELATIONSHIP_TYPE*]-(end))
+WITH path, relationships(path) AS rels
+UNWIND rels AS rel
+WITH rel, startNode(rel) AS startNode, endNode(rel) AS endNode
+RETURN startNode.property AS StartNodeProperty, rel.property AS RelationshipProperty, endNode.property AS EndNodeProperty
+
+  // contoh 
+MATCH (start:Movie {title: 'Unforgiven'}), (end:Movie {title: 'The Da Vinci Code'})
+MATCH path = shortestPath((start)-[:FRIEND_OF*]-(end))
+WITH path, relationships(path) AS FriendOf
+UNWIND FriendOf AS rel
+WITH rel, startNode(rel) AS startNode, endNode(rel) AS endNode
+RETURN startNode.title AS StartNodeProperty, rel.amount AS RelationshipProperty, endNode.title AS EndNodeProperty
+
+// membuat tabel mukti path
+MATCH (start:Label {property: 'value1'}), (end:Label {property: 'value2'})
+MATCH path = (start)-[:RELATIONSHIP_TYPE*]-(end)
+WITH collect(path) AS paths
+UNWIND paths AS path
+WITH path, relationships(path) AS rels
+UNWIND rels AS rel
+WITH rel, startNode(rel) AS startNode, endNode(rel) AS endNode
+RETURN startNode.property AS StartNodeProperty, rel.property AS RelationshipProperty, endNode.property AS EndNodeProperty
+
+MATCH (start:Movie {title: 'Unforgiven'}), (end:Movie {title: 'The Da Vinci Code'})
+MATCH paths = (start)-[:FRIEND_OF*]-(end)
+UNWIND relationships(paths) AS rel
+WITH rel, startNode(rel) AS startNode, endNode(rel) AS endNode
+RETURN startNode.title AS StartNodeTitle, rel.type AS RelationshipType, endNode.title AS EndNodeTitle
+
+// to make the value is not null
+MATCH (start:Movie {title: 'Unforgiven'}), (end:Movie {title: 'The Da Vinci Code'})
+MATCH paths = (start)-[:FRIEND_OF*]-(end)
+UNWIND relationships(paths) AS rel
+WITH rel, startNode(rel) AS startNode, endNode(rel) AS endNode
+RETURN startNode.title AS StartNodeTitle, rel.type AS RelationshipType, endNode.title AS EndNodeTitle,
+       COALESCE(rel.property, '') AS RelationshipProperty,
+       COALESCE(startNode.property, '') AS StartNodeProperty,
+       COALESCE(endNode.property, '') AS EndNodeProperty
+
+// Merge bikin relation di node yang sudah ada
+MATCH (node1:Label1 {property1: 'value1'}), (node2:Label2 {property2: 'value2'})
+MERGE (node1)-[:RELATIONSHIP_TYPE]->(node2)
+
+
