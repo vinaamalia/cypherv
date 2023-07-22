@@ -1,3 +1,32 @@
+// ======================= arti tiap klausa ====================================================================
+// DETACH : melepaskan atau mencabut suatu objek atau entitas dari sesuatu yang terhubung atau terikat dengannya
+// FOREACH :  melakukan beberapa perubahan atau operasi pada beberapa simpul atau hubungan berdasarkan hasil kueri sebelumnya.
+// UNION : menggabungkan dan menghapus duplikat dari hasil-hasil kueri yang berbeda, sehingga hanya hasil unik yang akan disertakan dalam hasil akhir.
+// UNWIND : klausa yang digunakan untuk "memecah" atau "mengurai" koleksi (seperti array atau himpunan) menjadi baris-baris terpisah dalam hasil kueri
+// YIELD : mengekstrak dan menampilkan hasil spesifik dari kueri yang lebih kompleks dan memberikan output yang lebih terperinci.
+// ASSERT : pemeriksaan internal dalam program guna memastikan bahwa kondisi yang dianggap benar selama pengembangan berlaku saat menjalankan program.
+// EXISTS : memeriksa apakah suatu pola atau hasil kueri menghasilkan setidaknya satu hasil atau tidak. Fungsi ini mengembalikan nilai boolean true jika hasil kueri tidak kosong (menghasilkan setidaknya satu baris), dan false jika hasil kueri kosong (tidak menghasilkan baris apa pun).
+//          Fungsi EXISTS sering digunakan dalam klausa WHERE atau kondisi lain dalam kueri untuk memeriksa keberadaan simpul atau hubungan yang sesuai dengan kriteria tertentu. Hal ini berguna untuk menghindari pengecualian atau hasil yang tidak diinginkan saat mencari data dalam graf yang mungkin tidak ada.
+// CONTAINS : memeriksa apakah suatu nilai atau elemen terkandung dalam sebuah koleksi, seperti array atau string. Fungsi CONTAINS mengembalikan nilai boolean true jika nilai atau elemen yang dicari terdapat dalam koleksi, dan false jika tidak.
+// DISTINCTS : klausa yang digunakan untuk menghilangkan duplikat dari hasil kueri.
+// CONSTRAINT : contoh NOT NULL constraint
+// INDEX :  Anda dapat menggunakan pernyataan CREATE INDEX. Indeks digunakan untuk meningkatkan kinerja pencarian data dengan mempercepat proses pencarian dan pemfilteran.
+// 
+
+
+// count(*) mengembalikan jumlah baris yang diambil dalam kueri
+MATCH (a:Person)-[:ACTED_IN]->(m:Movie)
+WHERE a.name = 'Tom Hanks'
+RETURN a.name AS ActorName,
+count(*) AS NumMovies
+
+HASIL
+╒═══════════╤═══════════╕
+│"ActorName"│"NumMovies"│
+╞═══════════╪═══════════╡
+│"Tom Hanks"│38         │
+└───────────┴───────────┘
+
 MATCH (m:Movie)<-[:ACTED_IN]-(p:Person)
 WHERE p.name = 'Charlie Chaplin' AND m.Runtime = 'Short'
 RETURN COUNT(m) AS ShortMovieCount
@@ -9,7 +38,6 @@ RETURN COUNT(m) AS ShortMovieCount
 │         5         │
 ╘═══════════════════╛
 
-================================================================================================================================
 //Using count() write a query to return the number of movies a person directed.
 
 MATCH (d:Director)-[:DIRECTED]-(m)
@@ -24,6 +52,141 @@ Director	       numMovies
 "Steven Spielberg"	30
 "Clint Eastwood"	30
 "Martin Scorsese"	30
+
+
+PROFILE MATCH (a:Person)-[:ACTED_IN]->(m:Movie)<-[:DIRECTED]-(d:Person)
+RETURN a.name AS ActorName,
+d.name AS DirectorName,
+count(*) AS NumMovies, collect(m.title) AS Movies
+ORDER BY NumMovies DESC
+
+hasil 
+╒════════════════╤════════════════╤═══════════╤══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╕
+│"ActorName"     │"DirectorName"  │"NumMovies"│"Movies"                                                                                                                                          │
+╞════════════════╪════════════════╪═══════════╪══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╡
+│"Clint Eastwood"│"Clint Eastwood"│20         │["Bridges of Madison County, The","Perfect World, A","Unforgiven","Absolute Power","Pale Rider","Heartbreak Ridge","True Crime","High Plains Drift│
+│                │                │           │er","Outlaw Josey Wales, The","Space Cowboys","Bronco Billy","Play Misty for Me","Gauntlet, The","Sudden Impact","Blood Work","Firefox","Honkytonk│
+│                │                │           │ Man","Rookie, The","Million Dollar Baby","Gran Torino"]                                                                                          │
+├────────────────┼────────────────┼───────────┼──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│"Woody Allen"   │"Woody Allen"   │19         │["Mighty Aphrodite","Manhattan Murder Mystery","Sleeper","Bananas","Annie Hall","Manhattan","Take the Money and Run","Stardust Memories","Sweet an│
+│                │                │           │d Lowdown","Small Time Crooks","Everything You Always Wanted to Know About Sex * But Were Afraid to Ask","Love and Death","Shadows and Fog","New Y│
+│                │                │           │ork Stories","Curse of the Jade Scorpion, The","Husbands and Wives","Midsummer Night's Sex Comedy, A","Zelig","Broadway Danny Rose"]              │
+
+
+// Using count() on property values
+
+MATCH (p:Person)
+RETURN count(p) , count(p.born)
+
+╒══════════╤═══════════════╕
+│"count(p)"│"count(p.born)"│
+╞══════════╪═══════════════╡
+│19047     │14103          │
+└──────────┴───────────────┘
+
+// ------> Counting for the next part of the query
+ only return actors that have 2 movies
+
+MATCH (a:Person)-[:ACTED_IN]->(m:Movie)
+WITH  a, count(*) AS NumMovies
+// can add Movies to also create the list of movies
+//, collect(m.title) AS Movies
+WHERE NumMovies = 2
+RETURN a.name AS Actor
+
+// 
+MATCH (p:Person {name: 'Elvis Presley'})-[]-(m:Movie)-[]-(a:Actor)
+RETURN count(*), count(m), count (a)
+hasil 
+╒══════════╤══════════╤═══════════╕
+│"count(*)"│"count(m)"│"count (a)"│
+╞══════════╪══════════╪═══════════╡
+│34        │34        │34         │
+└──────────┴──────────┴───────────┘
+// with distinct so it cant be a duplicate data
+MATCH (p:Person {name: 'Elvis Presley'})-[]-(m:Movie)-[]-(a:Actor)
+RETURN count(*), count(DISTINCT m), count (DISTINCT a)
+
+Hasil
+│"count(*)"│"count(DISTINCT m)"│"count (DISTINCT a)"│
+╞══════════╪═══════════════════╪════════════════════╡
+│34        │11                 │33                  │
+└──────────┴───────────────────┴────────────────────┘
+
+
+================================================================================================================================
+
+================================================================================================================================
+
+//=========================================================== CYPHER Agregation
+// collect ALL NODE using PATTERN COMPREHENSION for  enables you to create a list based upon values obtained during a query. 
+PROFILE
+MATCH(m:Movie)
+WHERE m.year = 2015
+OPTIONAL MATCH (a:Person)-[:ACTED_IN]-(m)
+WITH m, collect(DISTINCT a.name) AS Actors
+OPTIONAL MATCH (m)-[:DIRECTED]-(d:Person)
+RETURN m.title AS Movie, Actors, collect (DISTINCT d.name) AS Directors LIMIT 2
+
+Hasil
+│"Movie"                       │"Actors"                      │"Directors"                   │
+╞══════════════════════════════╪══════════════════════════════╪══════════════════════════════╡
+│"Mission: Impossible - Rogue N│["Simon Pegg","Tom Cruise","Je│["Christopher McQuarrie"]     │
+│ation"                        │remy Renner","Rebecca Ferguson│                              │
+│                              │"]                            │                              │
+├──────────────────────────────┼──────────────────────────────┼──────────────────────────────┤
+│"Jupiter Ascending"           │["Mila Kunis","Eddie Redmayne"│[" Lilly Wachowski","Lana Wach│
+│                              │,"Sean Bean","Channing Tatum"]│owski"]                       │
+└──────────────────────────────┴──────────────────────────────┴──────────────────────────────┘
+// Using Cypher’s pattern comprehension syntax: [<pattern> | value], we dynamically return a list using values obtained from the pattern. 
+// In some cases, pattern comprehension performs better than using collect() because it uses a subquery
+// Similar to OPTIONALMATCH
+// don’t need to have a collect() stage and you avoid potential cartesian products.
+
+PROFILE
+MATCH (m:Movie)
+WHERE m.year = 2015
+RETURN m.title AS Movie,
+[(dir:Person)-[:DIRECTED]->(m) | dir.name] AS Directors,
+[(actor:Person)-[:ACTED_IN]->(m) | actor.name] AS Actors LIMIT 2
+
+HASIL
+│"Movie"              │"Directors"          │"Actors"             │
+╞═════════════════════╪═════════════════════╪═════════════════════╡
+│"Mission: Impossible │["Christopher McQuarr│["Simon Pegg","Tom Cr│
+│- Rogue Nation"      │ie"]                 │uise","Jeremy Renner"│
+│                     │                     │,"Rebecca Ferguson"] │
+├─────────────────────┼─────────────────────┼─────────────────────┤
+│"Jupiter Ascending"  │[" Lilly Wachowski","│["Mila Kunis","Eddie │
+│                     │Lana Wachowski"]     │Redmayne","Sean Bean"│
+│                     │                     │,"Channing Tatum"]   │
+
+// Filtering during pattern comprehension
+MATCH (a:Person {name: 'Tom Hanks'})
+RETURN [(a)--(b:Movie)
+WHERE b.title CONTAINS "Toy" | b.title ]
+AS Movies
+
+HASIL
+"Movies"                                                       │
+╞═══════════════════════════════════════════════════════════════╡
+│["Toy Story of Terror","Toy Story 3","Toy Story 2","Toy Story"]│
+└───────────────────────────────────────────────────────────────┘
+// Adding more context to the list returned
+MATCH (a:Person {name: 'Tom Hanks'})
+RETURN [(a)--(b:Movie)
+WHERE b.title CONTAINS "Toy" | b.title + ": " + b.year]
+AS Movies
+
+HASIL
+╒══════════════════════════════════════════════════════════════════════╕
+│"Movies"                                                              │
+╞══════════════════════════════════════════════════════════════════════╡
+│["Toy Story of Terror: 2013","Toy Story 3: 2010","Toy Story 2: 1999","│
+│Toy Story: 1995"]                                                     │
+└──────────────────────────────────────────────────────────────────────┘
+
+
 
 ================================================================================================================================
 
