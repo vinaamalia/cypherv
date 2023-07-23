@@ -1,0 +1,388 @@
+
+//  NATIVE PROJECTION 
+CALL gds.graph.drop('native-proj', false);
+CALL gds.graph.project('native-proj',['User', 'Movie'], ['RATED']);
+CALL gds.degree.mutate('native-proj', {mutateProperty: 'ratingCount'});
+
+Hasil 
+Completed after 1 ms [centang]
+
+
+
+CALL gds.graph.nodeProperty.stream('native-proj','ratingCount', ['Movie'])
+YIELD nodeId, propertyValue
+RETURN gds.util.asNode(nodeId).title AS movieTitle, propertyValue AS ratingCount
+ORDER BY movieTitle DESCENDING LIMIT 10
+
+Hasil 
+
+│"movieTitle"                            │"ratingCount"│
+╞════════════════════════════════════════╪═════════════╡
+│"İtirazım Var"                          │0.0          │
+├────────────────────────────────────────┼─────────────┤
+│"À nous la liberté (Freedom for Us)"    │0.0          │
+├────────────────────────────────────────┼─────────────┤
+│"¡Three Amigos!"                        │0.0          │
+├────────────────────────────────────────┼─────────────┤
+│"xXx: State of the Union"               │0.0          │
+├────────────────────────────────────────┼─────────────┤
+│"xXx"                                   │0.0          │
+├────────────────────────────────────────┼─────────────┤
+│"loudQUIETloud: A Film About the Pixies"│0.0          │
+├────────────────────────────────────────┼─────────────┤
+│"eXistenZ"                              │0.0          │
+├────────────────────────────────────────┼─────────────┤
+│"[REC]"                                 │0.0          │
+├────────────────────────────────────────┼─────────────┤
+│"Zulu"                                  │0.0          │
+├────────────────────────────────────────┼─────────────┤
+│"Zulu"                                  │0.0          │
+└────────────────────────────────────────┴─────────────
+
+//  delete that graph and project a new one where we reverse the RATED relationship direction.
+CALL gds.graph.drop('native-proj', false);
+
+//replace with a project that has reversed relationship orientation
+CALL gds.graph.project(
+    'native-proj',
+    ['User', 'Movie'],
+    {RATED_BY: {type: 'RATED', orientation: 'REVERSE'}}
+);
+
+CALL gds.degree.mutate('native-proj', {mutateProperty: 'ratingCount'});
+
+Hasil centang centang
+
+//  use the degree algorithm we will get the rating counts 
+CALL gds.graph.nodeProperty.stream('native-proj','ratingCount', ['Movie'])
+YIELD nodeId, propertyValue
+RETURN gds.util.asNode(nodeId).title AS movieTitle, propertyValue AS ratingCount
+ORDER BY movieTitle DESCENDING LIMIT 5
+
+Hasil 
+│"movieTitle"         │"ratingCount"│
+╞═════════════════════╪═════════════╡
+│"İtirazım Var"       │1.0          │
+├─────────────────────┼─────────────┤
+│"À nous la liberté (F│1.0          │
+│reedom for Us)"      │             │
+├─────────────────────┼─────────────┤
+│"¡Three Amigos!"     │31.0         │
+├─────────────────────┼─────────────┤
+│"xXx: State of the Un│1.0          │
+│ion"                 │             │
+├─────────────────────┼─────────────┤
+│"xXx"                │23.0         │
+└─────────────────────┴─────────────┘
+
+// ===========================Including Node and Relationship Properties=======================
+// They can be used as weights in graph algorithms and features for machine learning.
+// defaultValue parameter allows us to fill in missing values with a default. In this case we use 0.
+CALL gds.graph.drop('native-proj', false);
+
+CALL gds.graph.project(
+    'native-proj',
+    ['User', 'Movie'],
+    {RATED: {orientation: 'UNDIRECTED'}},
+    {
+        nodeProperties:{
+            revenue: {defaultValue: 0}, // (1)
+            budget: {defaultValue: 0},
+            runtime: {defaultValue: 0}
+        },
+        relationshipProperties: ['rating'] // (2)
+    }
+);
+
+HASIL 
+CENTANG CENTANG
+
+
+// Parallel Relationship Aggregations
+CALL gds.graph.project(
+  'user-proj',
+  ['User'],
+  {
+    SENT_MONEY_TO: { aggregation: 'SINGLE' }
+  }
+);
+
+// create a property with the count of the relationships as well 
+CALL gds.graph.project(
+  'user-proj',
+  ['User'],
+  {
+    SENT_MONEY_TO: {
+      properties: {
+        numberOfTransactions: {
+          // the wildcard '*' is a placeholder, signaling that
+          // the value of the relationship property is derived
+          // and not based on Neo4j property.
+          property: '*',
+          aggregation: 'COUNT'
+        }
+      }
+    }
+  }
+);
+
+// SUM
+CALL gds.graph.project(
+  'user-proj',
+  ['User'],
+  {
+    SENT_MONEY_TO: {
+      properties: {
+        totalAmount: {
+          property: 'amount',
+          aggregation: 'SUM'
+        }
+      }
+    }
+  }
+);
+
+quiz : 
+Create a native graph projection
+Create a native graph projection representing Users rating Movies and ensure the RATED relationship is undirected. What is
+ the relationship count of the native projection?
+A : 200008
+
+ CALL gds.graph.project(
+  // Name of the projection
+  'user-rated-movie',
+  // Labels of nodes to include in the projection
+  ['User', 'Movie'],
+  // Relationship types to include in the projection
+  {
+    RATED: {
+        type: 'RATED',
+        orientation: 'UNDIRECTED'
+    }
+  }
+)
+YIELD relationshipCount
+
+// CYPHER PROJECTION
+Q : Create a cypher projection representing all User nodes that have rated a Movie with a release year greater than 2014. 
+Only include RATED relationships with ratings greater than or equal to 4 stars.
+
+CALL gds.graph.project.cypher(
+  // Projection name
+  'movie-ratings-after-2014',
+  // Cypher statement to find all nodes in projection
+  '
+    MATCH (u:User) RETURN id(u) AS id, labels(u) AS labels
+    UNION MATCH (m:Movie) WHERE m.year > 2014 RETURN id(m) AS id, labels(m) AS labels
+  ',
+  // Cypher statement to find every User that rated a Movie
+  // where the rating property is greater than or equal to 4
+  // and the movie was released after 2014 (year > 2014)
+  '
+    MATCH (u:User)-[r:RATED]->(m:Movie)
+    WHERE r.rating >= 4 AND m.year > 2014
+    RETURN id(u) AS source,
+        id(m) AS target,
+        r.rating AS rating,
+        "RATED" AS type
+  '
+);
+
+// DEGREE CENTRALITY
+cypher : Create the Projection
+CALL gds.graph.project(
+    'actor-directors',    // Projection name
+    ['Actor', 'Movie'],  // Labels
+    'DIRECTED'            // Relationship type
+)
+
+// ========================IMPORT AND EXPLORATION===================================
+// DATA IMPORT : pREVIEWING THE csv
+LOAD CSV WITH HEADERS FROM "https://raw.githubusercontent.com/tomasonjo/blog-datasets/main/survey/responses.csv" AS row
+RETURN row
+LIMIT 5;
+
+// DATA IMPORT : CREATING PERSON NODE <ADDED 1010 NODES>
+LOAD CSV // (1)
+WITH HEADERS // (2)
+FROM "https://raw.githubusercontent.com/tomasonjo/blog-datasets/main/survey/responses.csv" AS row  // (3)
+CREATE (p:Person) // (4)
+SET p = row // (5)
+
+MATCH (p:Person)
+RETURN count(p)
+
+// DATA IMPORT : VALIDATING THE IMOORT
+MATCH (p:Person)
+RETURN p.Age AS age,
+       p.Gender AS gender,
+       p.Assertiveness AS assertiveness
+LIMIT 3;
+
+//  DATA IMPORT : Converting properties to a float type
+// toFloat() function accepts a string as a parameter and converts it to a floating point value.
+UNWIND ["2", "string", Null] AS element
+RETURN toFloat(element);
+
+hasil
+╒══════════════════╕
+│"toFloat(element)"│
+╞══════════════════╡
+│2.0               │
+├──────────────────┤
+│null              │
+├──────────────────┤
+│null              │
+└──────────────────
+
+Kalau g pake to float hasilnya
+UNWIND ["2", "string", Null] AS element
+RETURN element;
+hasil
+╒═════════╕
+│"element"│
+╞═════════╡
+│"2"      │
+├─────────┤
+│"string" │
+├─────────┤
+│null     │
+└─────────┘
+
+// Cypher does not support setting dynamic node properties, use the apoc.create.setProperty feature to update the property.
+// DATA IMPORT : SET PROPERTIES
+:auto // Run in an implicit transaction within Neo4j Browser
+MATCH (p:Person) // (1)
+CALL {
+  WITH p
+  UNWIND keys(p) AS key // (3)
+  WITH p, key, toFloat(p[key]) AS value // (4)
+  WHERE value IS NOT null
+  CALL apoc.create.setProperty(p, key, value) YIELD node // (5)
+  RETURN DISTINCT 'done' AS result
+} IN TRANSACTIONS OF 100 rows // (2)
+RETURN DISTINCT result
+
+HASIL
+╒════════╕
+│"result"│
+╞════════╡
+│"done"  │
+└────────┘
+Keterangan
+1. Find all nodes with a :Person label
+2. Split the (:Person) nodes into batches of 100
+3. Use the keys() function to get all property keys for the node and process one per line
+4. Access the property value using square brackets toFloat() to attempt to convert it to a float
+5.Use apoc.create.setProperty() to set the new value
+
+// Distribution of interest in Biology
+// apoc.agg.statistics function can be used to evaluate a distribution. 
+MATCH (p:Person)
+RETURN apoc.agg.statistics(p.Biology)
+Hasil
+│"apoc.agg.statistics(p.Biology)"                                      │
+╞══════════════════════════════════════════════════════════════════════╡
+│{"total":1004,"min":1.0,"minNonZero":1.0,"max":5.0,"mean":2.6653465103│
+│81813,"0.5":2.0000076293945312,"0.99":5.000022888183594,"0.75":4.00002│
+│2888183594,"0.9":5.000022888183594,"0.95":5.000022888183594,"stdev":1.│
+│3834423139082523}                                                     │
+└──────────────────────────────────────────────────────────────────────┘
+
+// ===============PREPOCESSING STEP========================
+// Encoding Categorical variables
+
+MATCH (p:Person)
+SET p.PunctualityEncoding = CASE p['Punctuality']
+   WHEN 'i am often running late' THEN 1
+   WHEN 'i am often early' THEN 3
+   WHEN 'i am always on time' THEN 5
+   ELSE 3 END
+
+
+
+
+// ==============================PATH FINDING WITH GS ==========================
+// CYPHER Shorting Path
+MATCH (source:Airport {iata: 'BNA'}), (target:Airport {iata: 'HKT'})  
+MATCH p=shortestPath((source)-[:HAS_ROUTE*]->(target))
+RETURN length(p) AS result
+
+Hasil 
+3
+
+// 
+MATCH (source:Airport {iata: 'BNA'}), (target:Airport {iata: 'HKT'})  
+MATCH p=shortestPath((source)-[:HAS_ROUTE*]->(target))
+RETURN p
+
+MATCH (source:Airport {iata: 'BNA'}), (target:Airport {iata: 'HKT'})  
+MATCH p=allShortestPaths((source)-[:HAS_ROUTE*]->(target))
+RETURN count(p) AS result
+Hasil
+206
+
+// Dijkstra’s Source-Target Shortest Path
+// Create a Projected Graph
+CALL gds.graph.project(
+  'routes',
+  'Airport',
+  'HAS_ROUTE',
+  {relationshipProperties:'distance'}
+);
+
+╒═════════════════════════╤═════════════════════════╤═══════════╤═══════════╤═══════════════════╤═══════════════╕
+│"nodeProjection"         │"relationshipProjection" │"graphName"│"nodeCount"│"relationshipCount"│"projectMillis"│
+╞═════════════════════════╪═════════════════════════╪═══════════╪═══════════╪═══════════════════╪═══════════════╡
+│{"Airport":{"label":"Airp│{"HAS_ROUTE":{"orientatio│"routes"   │3503       │46389              │9410           │
+│ort","properties":{}}}   │n":"NATURAL","indexInvers│           │           │                   │               │
+│                         │e":false,"aggregation":"D│           │           │                   │               │
+│                         │EFAULT","type":"HAS_ROUTE│           │           │                   │               │
+│                         │","properties":{"distance│           │           │                   │               │
+│                         │":{"defaultValue":null,"p│           │           │                   │               │
+│                         │roperty":"distance","aggr│           │           │                   │               │
+│                         │egation":"DEFAULT"}}}}   │           │           │                   │               │
+└─────────────────────────┴─────────────────────────┴───────────┴───────────┴───────────────────┴───────────────┘
+// Find the Source-Target Shortest Path
+MATCH (source:Airport {iata: "BNA"}),
+      (target:Airport {iata:"HKT"})
+
+CALL gds.shortestPath.dijkstra.stream(
+  'routes',
+  {
+    sourceNode:source,
+    targetNode:target,
+    relationshipWeightProperty:'distance'
+  }
+) YIELD totalCost
+RETURN totalCost;
+
+│"totalCost"│
+╞═══════════╡
+│9387.0     │
+└───────────┘
+// short - target shortest path
+MATCH (source:Airport {iata: "BNA"}),
+      (target:Airport {iata:"HKT"})
+
+CALL gds.shortestPath.yens.stream(
+  'routes',
+  {
+    sourceNode:source,
+    targetNode:target,
+    relationshipWeightProperty:'distance',
+    k:3
+  }
+) YIELD index, totalCost
+WHERE index = 2 // index starts at 0
+RETURN totalCost
+
+ 9389.0
+
+ Pagerank
+ gds.util.asNode
+ tier 
+ Node embedding
+ gds.util.nodeProperty
+ CALL gds.pageRank.write.estimat
+ what is the run time for calculating the betweeness centrality ?
