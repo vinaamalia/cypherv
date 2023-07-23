@@ -1,0 +1,45 @@
+//  use a combination of Cypher queries and control structures (e.g., FOREACH, WITH) to implement Yen's algorithm. 
+
+ // Step 1: Find the shortest path using built-in Cypher function
+MATCH p = shortestPath((startNode)-[:CONNECTED*]->(endNode))
+RETURN p AS path, reduce(cost = 0, r in relationships(p) | cost + r.weight) AS totalCost
+
+// Step 2: Initialize a list to store K shortest paths
+WITH collect(path) AS shortestPaths, collect(totalCost) AS shortestCosts
+WITH shortestPaths, shortestCosts, [] AS kShortestPaths, [] AS kShortestCosts
+
+// Step 3: Specify the value of K (e.g., K = 5 for finding 5 shortest paths)
+// Adjust this value as per your requirement
+WITH shortestPaths, shortestCosts, 5 AS K
+
+// Step 4: Implement Yen's algorithm to find K shortest paths
+FOREACH (k IN range(0, K - 1) |
+  WITH k, kShortestPaths, kShortestCosts, shortestPaths[0..k] AS prevPaths, shortestCosts[0..k] AS prevCosts
+  // Compute the potential k-th shortest path
+  MATCH spurNode = (p1)-[:CONNECTED]->(p2)
+  WHERE p1 IN nodes(shortestPaths[k]) AND NOT p2 IN nodes(shortestPaths[k])
+  AND ALL(r in relationships(shortestPaths[k]) WHERE r <> spurNode)
+  
+  // Get the spur path
+  WITH k, kShortestPaths, kShortestCosts, prevPaths, prevCosts, spurNode, shortestPaths[k] AS spurPath
+  MATCH spurPath = shortestPath((spurPath)-[:CONNECTED*]->(p2))
+  WITH k, kShortestPaths, kShortestCosts, prevPaths, prevCosts, spurNode, spurPath,
+       reduce(cost = 0, r in relationships(spurPath) | cost + r.weight) AS spurCost
+  
+  // Concatenate the paths to form the potential k-th shortest path
+  WITH k, kShortestPaths + prevPaths + spurPath AS potentialPath,
+       kShortestCosts + prevCosts + spurCost AS potentialCost
+  
+  // Find the alternative paths and filter duplicates
+  WITH k, collect(potentialPath) AS paths, collect(potentialCost) AS costs
+  UNWIND range(0, size(paths) - 1) AS i
+  WITH k, paths[i], costs[i], collect(j IN range(0, size(paths) - 1) WHERE j <> i AND paths[j] = paths[i]) AS duplicates
+  WHERE size(duplicates) = 0
+  
+  // Add the k-th shortest path to the list
+  WITH k, paths[k] AS kthPath, costs[k] AS kthCost
+  SET kShortestPaths = kShortestPaths + kthPath, kShortestCosts = kShortestCosts + kthCost
+)
+
+// Step 5: Return the K shortest paths and their costs
+RETURN kShortestPaths AS shortestPaths, kShortestCosts AS shortestCosts
